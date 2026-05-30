@@ -1,3 +1,4 @@
+<img width="1983" height="793" alt="cf032290-5660-4468-a77b-9890a343d5d0" src="https://github.com/user-attachments/assets/38a29233-5b6a-4a52-b006-0402675f5ea4" />
 # J.A.R.V.I.S – AI голосовий асистент (WPF)
 
 Футуристичний десктопний AI-асистент, натхненний системою J.A.R.V.I.S з Iron Man.  
