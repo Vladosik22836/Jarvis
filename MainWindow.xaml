@@ -9,34 +9,48 @@
 
     <Grid Margin="20">
 
+        <!-- Основна сітка інтерфейсу:
+             3 рядки (шапка / основна зона / нижня панель)
+             3 колонки (швидкі дії / AI ядро / журнал подій) -->
         <Grid.RowDefinitions>
             <RowDefinition Height="80"/>
+            <!-- Верхня панель стану системи -->
             <RowDefinition Height="*"/>
+            <!-- Основна робоча зона -->
             <RowDefinition Height="120"/>
+            <!-- Панель введення команд -->
         </Grid.RowDefinitions>
 
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="320"/>
+            <!-- Ліва панель: швидкі дії -->
             <ColumnDefinition Width="*"/>
+            <!-- Центр: ядро AI -->
             <ColumnDefinition Width="350"/>
+            <!-- Права панель: журнал подій -->
         </Grid.ColumnDefinitions>
 
-        <!-- HEADER -->
-
+        <!-- HEADER (верхня інформаційна панель) -->
         <Grid Grid.Row="0" Grid.ColumnSpan="3">
 
+            <!-- Назва системи J.A.R.V.I.S -->
             <TextBlock Text="J.A.R.V.I.S"
                        FontSize="28"
                        FontWeight="SemiBold"
                        VerticalAlignment="Center">
+
+                <!-- Градієнт для “технологічного” вигляду -->
                 <TextBlock.Foreground>
                     <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
                         <GradientStop Color="#FF848484"/>
+                        <!-- нейтральний сірий -->
                         <GradientStop Color="#8EFFB68B" Offset="0.393"/>
+                        <!-- акцент AI -->
                     </LinearGradientBrush>
                 </TextBlock.Foreground>
             </TextBlock>
 
+            <!-- Індикатор стану системи -->
             <Border Width="220"
                     Height="45"
                     HorizontalAlignment="Center"
@@ -45,6 +59,7 @@
                     BorderBrush="#00C8FF"
                     BorderThickness="1">
 
+                <!-- Статус активності асистента -->
                 <TextBlock Text="● Система активна"
                            Foreground="#00FF88"
                            HorizontalAlignment="Center"
@@ -53,8 +68,7 @@
 
         </Grid>
 
-        <!-- LEFT PANEL -->
-
+        <!-- ЛІВА ПАНЕЛЬ (швидкі команди) -->
         <Border Grid.Row="1"
                 Grid.Column="0"
                 Background="#121826"
@@ -63,38 +77,52 @@
 
             <StackPanel Margin="15">
 
+                <!-- Заголовок секції -->
                 <TextBlock Text="Швидкі дії"
                            FontSize="22"
                            Foreground="White"
                            Margin="0,0,0,20"/>
 
+                <!-- Кнопка запуску блокнота -->
                 <Button Content="📄 Відкрити блокнот"
                         Height="60"
-                        Margin="0,0,0,10" Foreground="White" Background="#FF0E0E0E"/>
+                        Margin="0,0,0,10"
+                        Foreground="White"
+                        Background="#FF0E0E0E"/>
 
+                <!-- Кнопка запуску калькулятора -->
                 <Button Content="🧮 Відкрити калькулятор"
                         Height="60"
-                        Margin="0,0,0,10" Foreground="White" Background="#FF0E0E0E"/>
+                        Margin="0,0,0,10"
+                        Foreground="White"
+                        Background="#FF0E0E0E"/>
 
+                <!-- Кнопка запуску браузера -->
                 <Button Content="🌐 Відкрити браузер"
                         Height="60"
-                        Margin="0,0,0,10" Background="#FF0E0E0E" Foreground="White"/>
+                        Margin="0,0,0,10"
+                        Background="#FF0E0E0E"
+                        Foreground="White"/>
 
+                <!-- Отримання поточного часу -->
                 <Button Content="🕒 Поточний час"
                         Height="60"
-                        Margin="0,0,0,10" Background="#FF0E0E0E" Foreground="White"/>
+                        Margin="0,0,0,10"
+                        Background="#FF0E0E0E"
+                        Foreground="White"/>
 
+                <!-- Очищення журналу подій -->
                 <Button Content="🗑 Очистити журнал"
-                        Height="60" Background="#FF0E0E0E" Foreground="White"/>
+                        Height="60"
+                        Background="#FF0E0E0E"
+                        Foreground="White"/>
 
             </StackPanel>
 
         </Border>
 
-        <!-- CENTER -->
-
-        <Grid Grid.Row="1"
-              Grid.Column="1">
+        <!-- ЦЕНТР (AI ядро / візуалізація асистента) -->
+        <Grid Grid.Row="1" Grid.Column="1">
 
             <Border Background="#121826"
                     CornerRadius="25"
@@ -102,16 +130,16 @@
 
                 <Grid>
 
-                    <!-- AI Core -->
-
+                    <!-- Зовнішнє кільце: індикатор активності системи -->
                     <Ellipse x:Name="OuterRing"
-                              Width="320"
-                    Height="320"
-                    Stroke="#00C8FF"
-                     StrokeThickness="4"
-                     HorizontalAlignment="Center"
-                    VerticalAlignment="Center"/>
+                             Width="320"
+                             Height="320"
+                             Stroke="#00C8FF"
+                             StrokeThickness="4"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"/>
 
+                    <!-- Середнє кільце: ефект сканування / пульсації -->
                     <Ellipse Width="260"
                              Height="260"
                              Stroke="#29FFE6"
@@ -119,29 +147,34 @@
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"/>
 
+                    <!-- Центральне ядро AI -->
                     <Ellipse Width="180"
                              Height="180"
                              Fill="#1A2438"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"/>
 
+                    <!-- Іконка мікрофона (режим прослуховування) -->
                     <TextBlock Text="🎤"
                                FontSize="80"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>
 
+                    <!-- Статус роботи асистента -->
                     <StackPanel VerticalAlignment="Bottom"
                                 Margin="0,0,0,21">
 
+                        <!-- Асистент слухає користувача -->
                         <TextBlock Text="Слухаю..."
                                    Foreground="White"
                                    FontSize="42"
                                    HorizontalAlignment="Center"/>
 
+                        <!-- Підказка користувачу -->
                         <TextBlock Text="Скажіть команду після сигналу"
                                    Foreground="#AAAAAA"
                                    FontSize="18"
-                                   HorizontalAlignment="Center" RenderTransformOrigin="0.497,0"/>
+                                   HorizontalAlignment="Center"/>
 
                     </StackPanel>
 
@@ -151,8 +184,7 @@
 
         </Grid>
 
-        <!-- RIGHT PANEL -->
-
+        <!-- ПРАВА ПАНЕЛЬ (журнал подій системи) -->
         <Border Grid.Row="1"
                 Grid.Column="2"
                 Background="#121826"
@@ -161,19 +193,28 @@
 
             <StackPanel Margin="15">
 
+                <!-- Заголовок журналу -->
                 <TextBlock Text="Журнал подій"
                            FontSize="22"
                            Foreground="White"
                            Margin="0,0,0,20"/>
 
+                <!-- Лог виконаних команд і дій -->
                 <ListBox Background="Transparent"
                          BorderThickness="0"
                          Foreground="White">
 
                     <ListBoxItem>18:42 - Команда отримана</ListBoxItem>
+                    <!-- розпізнано команду користувача -->
+
                     <ListBoxItem>18:42 - Відкрито калькулятор</ListBoxItem>
+                    <!-- виконано дію системою -->
+
                     <ListBoxItem>18:43 - Запит часу</ListBoxItem>
+                    <!-- запит поточного часу -->
+
                     <ListBoxItem>18:44 - Відкрито браузер</ListBoxItem>
+                    <!-- запуск браузера -->
 
                 </ListBox>
 
@@ -181,8 +222,7 @@
 
         </Border>
 
-        <!-- BOTTOM PANEL -->
-
+        <!-- НИЖНЯ ПАНЕЛЬ (ввід команд + мікрофон) -->
         <Border Grid.Row="2"
                 Grid.ColumnSpan="3"
                 Background="#121826"
@@ -196,60 +236,41 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="80"/>
                 </Grid.ColumnDefinitions>
+
+                <!-- КНОПКА МІКРОФОНА -->
                 <Button x:Name="MicButton"
-        Width="60"
-        Height="60"
-        Background="#FF0E0E0E"
-        Foreground="White"
-        Content="🎤">
-
-                    <Button.Template>
-                        <ControlTemplate TargetType="Button">
-                            <Border Background="{TemplateBinding Background}"
-                    CornerRadius="30">
-                                <ContentPresenter HorizontalAlignment="Center"
-                                  VerticalAlignment="Center"/>
-                            </Border>
-                        </ControlTemplate>
-                    </Button.Template>
-
+                        Width="60"
+                        Height="60"
+                        Background="#FF0E0E0E"
+                        Foreground="White"
+                        Content="🎤">
+                    <!-- Активація голосового введення -->
                 </Button>
 
+                <!-- СТАТУС ВВЕДЕННЯ -->
                 <StackPanel Grid.Column="1"
                             VerticalAlignment="Center">
 
+                    <!-- Стан системи -->
                     <TextBlock Text="Готовий прийняти команду..."
                                Foreground="White"
                                FontSize="22"/>
 
+                    <!-- Підказка користувачу -->
                     <TextBlock Text="Скажіть або натисніть мікрофон"
                                Foreground="#999999"/>
 
                 </StackPanel>
 
+                <!-- КНОПКА ВІДПРАВКИ КОМАНДИ -->
                 <Button Grid.Column="2"
-        Width="60"
-        Height="60"
-        Background="#FF0E0E0E"
-        Foreground="White"
-        Content="➜">
-
-                    <Button.Template>
-                        <ControlTemplate TargetType="Button">
-
-                            <Border Background="{TemplateBinding Background}"
-                    CornerRadius="30">
-
-                                <ContentPresenter HorizontalAlignment="Center"
-                                  VerticalAlignment="Center"/>
-
-                            </Border>
-
-                        </ControlTemplate>
-                    </Button.Template>
-
+                        Width="60"
+                        Height="60"
+                        Background="#FF0E0E0E"
+                        Foreground="White"
+                        Content="➜">
+                    <!-- Відправка текстової команди -->
                 </Button>
-
 
             </Grid>
 
