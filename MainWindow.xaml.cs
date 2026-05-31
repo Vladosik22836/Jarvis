@@ -22,6 +22,8 @@ namespace Jarvis
         {
             InitializeComponent(); // Підключення XAML-інтерфейсу
 
+            _voice = new VoiceAssistant();
+
             Opacity = 0; // Початково вікно повністю прозоре (для ефекту появи)
 
             Loaded += MainWindow_Loaded;
@@ -32,11 +34,15 @@ namespace Jarvis
         /// Подія завантаження вікна
         /// Тут стартують всі основні анімації інтерфейсу
         /// </summary>
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private async   void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             StartFadeIn();       // Плавна поява вікна
             StartMicAnimation(); // Анімація кнопки мікрофона (пульсація)
             StartCoreAnimation(); // Обертання AI-ядра (зовнішнє кільце)
+
+            await Task.Delay(1000);
+
+            await _voice.GreetUserAsync();
         }
 
         /// <summary>
@@ -55,6 +61,48 @@ namespace Jarvis
             // Запуск анімації прозорості вікна
             BeginAnimation(Window.OpacityProperty, fade);
         }
+
+        private void Header_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == System.Windows.Input.MouseButtonState.Pressed)
+            {
+                this.DragMove();
+            }
+        }
+
+        // ========================================================================
+        // УПРАВЛІННЯ ВІКНОМ (Перетягування та кнопки управління)
+        // ========================================================================
+
+        private void BtnMinimize_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
+        }
+
+        private void BtnMaximize_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.WindowState == WindowState.Normal)
+            {
+                this.WindowState = WindowState.Maximized;
+            }
+            else
+            {
+                this.WindowState = WindowState.Normal;
+            }
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
+        }
+
+        // ========================================================================
+        // ПУСТЫЕ ЗАГЛУШКИ ДЛЯ ФРОНТЕНДА (Бэкендер заполнит их позже)
+        // ========================================================================
+
+        private void BtnClearLog_Click(object sender, RoutedEventArgs e) { }
+
+        private void MicButton_Click(object sender, RoutedEventArgs e) { }
 
         /// <summary>
         /// Анімація кнопки мікрофона
@@ -115,8 +163,7 @@ namespace Jarvis
             // Запуск анімації обертання
             rotate.BeginAnimation(RotateTransform.AngleProperty, rotation);
         }
-
-        private void OpenNotepad_Click(object sender, RoutedEventArgs e)
+        private void BtnOpenNotepad_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -150,7 +197,7 @@ namespace Jarvis
             }
         }
 
-        private void OpenCalculator_Click(object sender, RoutedEventArgs e)
+        private void BtnOpenCalc_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -163,7 +210,7 @@ namespace Jarvis
             }
         }
 
-        private void OpenBrowser_Click(object sender, RoutedEventArgs e)
+        private void BtnOpenBrowser_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -176,16 +223,18 @@ namespace Jarvis
                                 "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-    }
-    internal static class NativeMethods
-    {
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        internal static extern bool SetForegroundWindow(IntPtr hWnd);
+        internal static class NativeMethods
+        {
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            internal static extern bool SetForegroundWindow(IntPtr hWnd);
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        internal static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            internal static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        internal static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            internal static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
+        }
+
+        private VoiceAssistant _voice;
     }
 }
