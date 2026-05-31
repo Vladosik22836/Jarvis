@@ -88,21 +88,24 @@
                         Height="60"
                         Margin="0,0,0,10"
                         Foreground="White"
-                        Background="#FF0E0E0E"/>
+                        Background="#FF0E0E0E"
+                        Click="OpenNotepad_Click"/>
 
                 <!-- Кнопка запуску калькулятора -->
                 <Button Content="🧮 Відкрити калькулятор"
                         Height="60"
                         Margin="0,0,0,10"
                         Foreground="White"
-                        Background="#FF0E0E0E"/>
+                        Background="#FF0E0E0E"
+                        Click="OpenCalculator_Click"/>
 
                 <!-- Кнопка запуску браузера -->
                 <Button Content="🌐 Відкрити браузер"
                         Height="60"
                         Margin="0,0,0,10"
                         Background="#FF0E0E0E"
-                        Foreground="White"/>
+                        Foreground="White"
+                        Click="OpenBrowser_Click"/>
 
                 <!-- Отримання поточного часу -->
                 <Button Content="🕒 Поточний час"

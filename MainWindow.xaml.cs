@@ -115,5 +115,77 @@ namespace Jarvis
             // Запуск анімації обертання
             rotate.BeginAnimation(RotateTransform.AngleProperty, rotation);
         }
+
+        private void OpenNotepad_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var existing = System.Diagnostics.Process.GetProcessesByName("notepad");
+
+                if (existing.Length > 0)
+                {
+                    var process = existing[0];
+                    NativeMethods.SetForegroundWindow(process.MainWindowHandle);
+
+                    // Чекаємо щоб вікно стало активним
+                    System.Threading.Thread.Sleep(200);
+
+                    // Ctrl затиснути
+                    NativeMethods.keybd_event(0x11, 0, 0, 0); // VK_CONTROL down
+                                                              // N натиснути
+                    NativeMethods.keybd_event(0x4E, 0, 0, 0); // N down
+                    NativeMethods.keybd_event(0x4E, 0, 2, 0); // N up
+                                                              // Ctrl відпустити
+                    NativeMethods.keybd_event(0x11, 0, 2, 0); // VK_CONTROL up
+                }
+                else
+                {
+                    System.Diagnostics.Process.Start("notepad.exe");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Помилка: {ex.Message}", "Помилка",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void OpenCalculator_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start("calc.exe");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Не вдалося відкрити калькулятор: {ex.Message}",
+                                "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void OpenBrowser_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string chromePath = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
+                System.Diagnostics.Process.Start(chromePath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Не вдалося відкрити браузер: {ex.Message}",
+                                "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+    internal static class NativeMethods
+    {
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        internal static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        internal static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        internal static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
     }
 }
