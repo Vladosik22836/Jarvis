@@ -26,19 +26,42 @@ namespace Jarvis
 
             Opacity = 0; // Початково вікно повністю прозоре (для ефекту появи)
 
-            Loaded += MainWindow_Loaded;
-            // Подія: коли вікно повністю завантажилось — запускаємо логіку
+            Loaded += MainWindow_Loaded;// Подія: коли вікно повністю завантажилось — запускаємо логіку
+
+            var timer = new System.Windows.Threading.DispatcherTimer();
+            timer.Interval = TimeSpan.FromSeconds(1);
+            timer.Tick += (s, e) =>
+            {
+                ClockText.Text = DateTime.Now.ToString("HH:mm");
+                DateText.Text = DateTime.Now.ToString("d MMMM yyyy", new System.Globalization.CultureInfo("uk-UA"));
+            };
+            timer.Start();
+        }
+
+        private void AddLog(string icon, string title, string subtitle, string iconColor)
+        {
+            var item = new
+            {
+                Icon = icon,
+                Title = title,
+                Subtitle = subtitle,
+                IconColor = iconColor,
+                Time = DateTime.Now.ToString("HH:mm")
+            };
+            LogListBox.Items.Insert(0, item);
         }
 
         /// <summary>
         /// Подія завантаження вікна
         /// Тут стартують всі основні анімації інтерфейсу
         /// </summary>
-        private async   void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             StartFadeIn();       // Плавна поява вікна
             StartMicAnimation(); // Анімація кнопки мікрофона (пульсація)
             StartCoreAnimation(); // Обертання AI-ядра (зовнішнє кільце)
+
+            AddLog("🛡️", "Програма запущена", "J.A.R.V.I.S активний", "#00FF88"); // ← додай
 
             await Task.Delay(1000);
 
@@ -163,78 +186,59 @@ namespace Jarvis
             // Запуск анімації обертання
             rotate.BeginAnimation(RotateTransform.AngleProperty, rotation);
         }
+
         private void BtnOpenNotepad_Click(object sender, RoutedEventArgs e)
         {
-            try
+            var existing = System.Diagnostics.Process.GetProcessesByName("notepad");
+            if (existing.Length > 0)
+                NativeMethods.SetForegroundWindow(existing[0].MainWindowHandle);
+            else
             {
-                var existing = System.Diagnostics.Process.GetProcessesByName("notepad");
-
-                if (existing.Length > 0)
-                {
-                    var process = existing[0];
-                    NativeMethods.SetForegroundWindow(process.MainWindowHandle);
-
-                    // Чекаємо щоб вікно стало активним
-                    System.Threading.Thread.Sleep(200);
-
-                    // Ctrl затиснути
-                    NativeMethods.keybd_event(0x11, 0, 0, 0); // VK_CONTROL down
-                                                              // N натиснути
-                    NativeMethods.keybd_event(0x4E, 0, 0, 0); // N down
-                    NativeMethods.keybd_event(0x4E, 0, 2, 0); // N up
-                                                              // Ctrl відпустити
-                    NativeMethods.keybd_event(0x11, 0, 2, 0); // VK_CONTROL up
-                }
-                else
-                {
-                    System.Diagnostics.Process.Start("notepad.exe");
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Помилка: {ex.Message}", "Помилка",
-                                MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Diagnostics.Process.Start("notepad.exe");
+                AddLog("📝", "Блокнот відкрито", "Запуск Notepad", "#00C8FF");
             }
         }
 
         private void BtnOpenCalc_Click(object sender, RoutedEventArgs e)
         {
-            try
+            var existing = System.Diagnostics.Process.GetProcessesByName("CalculatorApp");
+            if (existing.Length > 0)
+            {
+                existing[0].Kill();
+                System.Threading.Thread.Sleep(300);
+                System.Diagnostics.Process.Start("calc.exe");
+                AddLog("🧮", "Калькулятор перезапущено", "Restart Calculator", "#00C8FF");
+            }
+            else
             {
                 System.Diagnostics.Process.Start("calc.exe");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Не вдалося відкрити калькулятор: {ex.Message}",
-                                "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+                AddLog("🧮", "Калькулятор відкрито", "Запуск Calculator", "#00C8FF");
             }
         }
 
         private void BtnOpenBrowser_Click(object sender, RoutedEventArgs e)
         {
-            try
+            var existing = System.Diagnostics.Process.GetProcessesByName("chrome");
+            if (existing.Length > 0)
+                NativeMethods.SetForegroundWindow(existing[0].MainWindowHandle);
+            else
             {
                 string chromePath = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
                 System.Diagnostics.Process.Start(chromePath);
+                AddLog("🌐", "Браузер відкрито", "Запуск Chrome", "#00C8FF");
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Не вдалося відкрити браузер: {ex.Message}",
-                                "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-        internal static class NativeMethods
-        {
-            [System.Runtime.InteropServices.DllImport("user32.dll")]
-            internal static extern bool SetForegroundWindow(IntPtr hWnd);
-
-            [System.Runtime.InteropServices.DllImport("user32.dll")]
-            internal static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
-
-            [System.Runtime.InteropServices.DllImport("user32.dll")]
-            internal static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
         }
 
         private VoiceAssistant _voice;
     }
+    internal static class NativeMethods
+    {
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        internal static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        internal static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    }
+
+
 }

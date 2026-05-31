@@ -148,8 +148,8 @@
 
                 <TextBlock Text="🕒" FontSize="24" Foreground="#7D8A9F" VerticalAlignment="Center" Margin="0,5,10,0"/>
                 <StackPanel VerticalAlignment="Center" Margin="0,5,20,0">
-                    <TextBlock Text="18:42" Foreground="White" FontSize="18" FontWeight="SemiBold"/>
-                    <TextBlock Text="25 травня 2026" Foreground="#7D8A9F" FontSize="12"/>
+                    <TextBlock x:Name="ClockText" Text="18:42" Foreground="White" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="DateText" Text="25 травня 2026" Foreground="#7D8A9F" FontSize="12"/>
                 </StackPanel>
                 <Button Content="⚙️" FontSize="20" Background="Transparent" Foreground="#7D8A9F" BorderThickness="0" Margin="0,5,30,0" FocusVisualStyle="{x:Null}">
                     <Button.Template>
@@ -336,7 +336,7 @@
 
                 <TextBlock Grid.Row="0" Text="Журнал подій" Foreground="White" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,20"/>
 
-                <ListBox x:Name="LogListBox" Grid.Row="1" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+                <ListBox x:Name="LogListBox" Grid.Row="1" Background="Transparent" BorderThickness="0" ItemTemplate="{StaticResource LogItemTemplate}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
             </Grid>
         </Border>
 
@@ -374,6 +374,6 @@
                 </Button>
             </Grid>
         </Border>
-
+        
     </Grid>
 </Window>
