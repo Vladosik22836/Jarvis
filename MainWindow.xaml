@@ -265,7 +265,7 @@
                                 <TextBlock Text="💻" Foreground="#00C8FF" Margin="0,0,8,0"/>
                                 <StackPanel>
                                     <TextBlock Text="CPU" Foreground="#7D8A9F" FontSize="12"/>
-                                    <TextBlock Text="18%" Foreground="White" FontSize="16" FontWeight="Bold"/>
+                                    <TextBlock x:Name="CpuText" Text="18%" Foreground="White" FontSize="16" FontWeight="Bold"/>
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>
@@ -274,7 +274,7 @@
                                 <TextBlock Text="🗄️" Foreground="#29FFE6" Margin="0,0,8,0"/>
                                 <StackPanel>
                                     <TextBlock Text="RAM" Foreground="#7D8A9F" FontSize="12"/>
-                                    <TextBlock Text="42%" Foreground="White" FontSize="16" FontWeight="Bold"/>
+                                    <TextBlock x:Name="RamText" Text="42%" Foreground="White" FontSize="16" FontWeight="Bold"/>
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>
@@ -336,7 +336,7 @@
 
                 <TextBlock Grid.Row="0" Text="Журнал подій" Foreground="White" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,20"/>
 
-                <ListBox x:Name="LogListBox" Grid.Row="1" Background="Transparent" BorderThickness="0" ItemTemplate="{StaticResource LogItemTemplate}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+                <ListBox x:Name="LogListBox" Grid.Row="1" Background="Transparent" BorderThickness="0" ItemTemplate="{StaticResource LogItemTemplate}" MouseDoubleClick="LogListBox_MouseDoubleClick" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
             </Grid>
         </Border>
 

@@ -1,21 +1,25 @@
-﻿using System;
+﻿using Microsoft.VisualBasic;
+using NAudio.Wave;
+using System;
 using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
+using Vosk;
 
 namespace Jarvis
 {
     public class VoiceAssistant
     {
         private readonly MediaPlayer _player;
+        private bool _isListening = false;
+        private VoskRecognizer? _voskRecognizer;
+        private WaveInEvent? _waveIn;
+        public bool IsListening => _isListening;
 
-        // API
         private readonly string _apiKey = "sk_65a234da2e4e40e4f3cfe0804be4d26bbbbd7d94030c7652";
-
-        // ID voice
         private readonly string _voiceId = "ErXwobaYiN019PkySvjV";
 
         public VoiceAssistant()
@@ -23,7 +27,6 @@ namespace Jarvis
             _player = new MediaPlayer();
             _player.Volume = 1.0;
 
-            // Відстежуємо помилки самого плеєра Windows
             _player.MediaFailed += (s, e) =>
             {
                 MessageBox.Show($"Плеєр не зміг відтворити файл!\nПричина: {e.ErrorException?.Message}", "Помилка MediaPlayer");
@@ -32,18 +35,15 @@ namespace Jarvis
 
         public async Task SpeakAsync(string text)
         {
-
             try
             {
                 using (HttpClient client = new HttpClient())
                 {
-                    // Авторизація ElevenLabs
                     client.DefaultRequestHeaders.Add("xi-api-key", _apiKey);
                     client.DefaultRequestHeaders.Add("User-Agent", "JarvisApp/1.0");
 
                     string url = $"https://api.elevenlabs.io/v1/text-to-speech/{_voiceId}";
 
-                    // Формуємо запит.
                     string jsonBody = $@"{{
                         ""text"": ""{text}"",
                         ""model_id"": ""eleven_multilingual_v2"",
@@ -54,24 +54,19 @@ namespace Jarvis
                     }}";
 
                     var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-
-                    // Відправляємо запит на сервер
                     HttpResponseMessage response = await client.PostAsync(url, content);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        // Зберігаємо отримане аудіо у тимчасовий файл
                         byte[] audioBytes = await response.Content.ReadAsByteArrayAsync();
-                        string tempFile = Path.Combine(Path.GetTempPath(), "jarvis_elevenlabs.mp3");
+                        string tempFile = Path.Combine(Path.GetTempPath(), $"jarvis_{Guid.NewGuid()}.mp3");
                         File.WriteAllBytes(tempFile, audioBytes);
 
-                        // Відтворюємо
                         _player.Open(new Uri(tempFile));
                         _player.Play();
                     }
                     else
                     {
-                        // Якщо ElevenLabs свариться (наприклад, закінчився ліміт символів)
                         string errorMsg = await response.Content.ReadAsStringAsync();
                         MessageBox.Show($"Помилка сервера ElevenLabs (Код {response.StatusCode}):\n{errorMsg}", "Помилка API");
                     }
@@ -96,6 +91,62 @@ namespace Jarvis
                 greeting = "Добрий вечір, сер. Радий вас бачити.";
 
             await SpeakAsync(greeting);
+        }
+
+        public void InitSpeech(Action<string> onCommandRecognized)
+        {
+            try
+            {
+                string modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "model");
+
+                if (!Directory.Exists(modelPath))
+                {
+                    MessageBox.Show($"Папка моделі не знайдена: {modelPath}", "Помилка");
+                    return;
+                }
+
+                Vosk.Vosk.SetLogLevel(-1);
+                var model = new Model(modelPath);
+                _voskRecognizer = new VoskRecognizer(model, 16000.0f);
+
+                _waveIn = new WaveInEvent();
+                _waveIn.WaveFormat = new WaveFormat(16000, 1);
+
+                _waveIn.DataAvailable += (s, e) =>
+                {
+                    if (_voskRecognizer.AcceptWaveform(e.Buffer, e.BytesRecorded))
+                    {
+                        var result = _voskRecognizer.Result();
+                        var text = System.Text.Json.JsonDocument.Parse(result)
+                                   .RootElement.GetProperty("text").GetString()?.ToLower() ?? "";
+
+                        if (!string.IsNullOrWhiteSpace(text))
+                            onCommandRecognized(text);
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Помилка ініціалізації мікрофона: {ex.Message}", "Помилка");
+            }
+        }
+
+        public void StartListening()
+        {
+            if (_waveIn != null && !_isListening)
+            {
+                _waveIn.StartRecording();
+                _isListening = true;
+            }
+        }
+
+        public void StopListening()
+        {
+            if (_waveIn != null && _isListening)
+            {
+                _waveIn.StopRecording();
+                _isListening = false;
+            }
         }
     }
 }

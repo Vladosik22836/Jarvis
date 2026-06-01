@@ -24,6 +24,62 @@ namespace Jarvis
 
             _voice = new VoiceAssistant();
 
+            _voice.InitSpeech(async (text) =>
+            {
+                if (text.Contains("джарвіс") || text.Contains("jarvis"))
+                {
+                    // Витягуємо команду після слова "джарвіс"
+                    string command = text
+                        .Replace("джарвіс", "")
+                        .Replace("jarvis", "")
+                        .Trim();
+
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        AiStateText.Text = "Слухаю команду...";
+                        AddLog("🎙️", "Активовано голосом", $"Команда: {command}", "#00C8FF");
+                    });
+
+                    await Application.Current.Dispatcher.InvokeAsync(async () =>
+                    {
+                        // Обробка команди
+                        if (string.IsNullOrWhiteSpace(command))
+                        {
+                            await _voice.SpeakAsync("Слухаю вас, сер.");
+                        }
+                        else if (command.Contains("привіт") || command.Contains("привіт"))
+                        {
+                            await _voice.SpeakAsync("Привіт, сер. Чим можу допомогти?");
+                        }
+                        else if (command.Contains("час") || command.Contains("година"))
+                        {
+                            string time = DateTime.Now.ToString("HH:mm");
+                            await _voice.SpeakAsync($"Зараз {time}, сер.");
+                        }
+                        else if (command.Contains("блокнот"))
+                        {
+                            System.Diagnostics.Process.Start("notepad.exe");
+                            await _voice.SpeakAsync("Відкриваю блокнот, сер.");
+                        }
+                        else if (command.Contains("калькулятор"))
+                        {
+                            System.Diagnostics.Process.Start("calc.exe");
+                            await _voice.SpeakAsync("Відкриваю калькулятор, сер.");
+                        }
+                        else if (command.Contains("браузер") || command.Contains("хром") || command.Contains("chrome"))
+                        {
+                            string chromePath = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
+                            System.Diagnostics.Process.Start(chromePath);
+                            await _voice.SpeakAsync("Відкриваю браузер, сер.");
+                        }
+                        else
+                        {
+                            await _voice.SpeakAsync($"Вибачте, команду \"{command}\" не розпізнано.");
+                        }
+                    });
+                }
+            });
+
             Opacity = 0; // Початково вікно повністю прозоре (для ефекту появи)
 
             Loaded += MainWindow_Loaded;// Подія: коли вікно повністю завантажилось — запускаємо логіку
@@ -32,10 +88,47 @@ namespace Jarvis
             timer.Interval = TimeSpan.FromSeconds(1);
             timer.Tick += (s, e) =>
             {
-                ClockText.Text = DateTime.Now.ToString("HH:mm");
-                DateText.Text = DateTime.Now.ToString("d MMMM yyyy", new System.Globalization.CultureInfo("uk-UA"));
+                timer.Tick += (s, e) =>
+                {
+                    ClockText.Text = DateTime.Now.ToString("HH:mm");
+                    DateText.Text = DateTime.Now.ToString("d MMMM yyyy", new System.Globalization.CultureInfo("uk-UA"));
+
+                    _cpuHistory.Add(_cpuCounter.NextValue());
+                    if (_cpuHistory.Count > 5) _cpuHistory.RemoveAt(0);
+                    CpuText.Text = $"{(int)_cpuHistory.Average()}%";
+
+                    RamText.Text = $"{(int)_ramCounter.NextValue()}%";
+                };
             };
             timer.Start();
+
+            // Таймер для відстеження закриття програм
+            bool notepadWasOpen = false;
+            bool calcWasOpen = false;
+            bool chromeWasOpen = false;
+
+            var processTimer = new System.Windows.Threading.DispatcherTimer();
+            processTimer.Interval = TimeSpan.FromSeconds(2);
+            processTimer.Tick += (s, e) =>
+            {
+                bool notepadOpen = System.Diagnostics.Process.GetProcessesByName("notepad").Length > 0;
+                bool calcOpen = System.Diagnostics.Process.GetProcessesByName("CalculatorApp").Length > 0;
+                bool chromeOpen = System.Diagnostics.Process.GetProcessesByName("chrome").Length > 0;
+
+                if (notepadWasOpen && !notepadOpen)
+                    AddLog("📝", "Блокнот закрито", "Notepad завершено", "#FF6B6B");
+
+                if (calcWasOpen && !calcOpen)
+                    AddLog("🧮", "Калькулятор закрито", "Calculator завершено", "#FF6B6B");
+
+                if (chromeWasOpen && !chromeOpen)
+                    AddLog("🌐", "Браузер закрито", "Chrome завершено", "#FF6B6B");
+
+                notepadWasOpen = notepadOpen;
+                calcWasOpen = calcOpen;
+                chromeWasOpen = chromeOpen;
+            };
+            processTimer.Start();
         }
 
         private void AddLog(string icon, string title, string subtitle, string iconColor)
@@ -118,14 +211,6 @@ namespace Jarvis
         {
             Application.Current.Shutdown();
         }
-
-        // ========================================================================
-        // ПУСТЫЕ ЗАГЛУШКИ ДЛЯ ФРОНТЕНДА (Бэкендер заполнит их позже)
-        // ========================================================================
-
-        private void BtnClearLog_Click(object sender, RoutedEventArgs e) { }
-
-        private void MicButton_Click(object sender, RoutedEventArgs e) { }
 
         /// <summary>
         /// Анімація кнопки мікрофона
@@ -229,7 +314,40 @@ namespace Jarvis
             }
         }
 
+        private void BtnClearLog_Click(object sender, RoutedEventArgs e)
+        {
+            LogListBox.Items.Clear();
+            AddLog("🗑️", "Журнал очищено", "Всі записи видалено", "#FF6B6B");
+        }
+
+        private void LogListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (LogListBox.SelectedItem != null)
+                LogListBox.Items.Remove(LogListBox.SelectedItem);
+        }
+
+        private void MicButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_voice.IsListening)
+            {
+                _voice.StopListening();
+                AiStateText.Text = "Мікрофон вимкнено";
+                AddLog("🎙️", "Мікрофон вимкнено", "Очікування команди", "#FF6B6B");
+            }
+            else
+            {
+                _voice.StartListening();
+                AiStateText.Text = "Слухаю...";
+                AddLog("🎙️", "Мікрофон увімкнено", "Очікування слова Jarvis", "#00FF88");
+            }
+        }
+
         private VoiceAssistant _voice;
+        private System.Diagnostics.PerformanceCounter _cpuCounter =
+            new System.Diagnostics.PerformanceCounter("Processor", "% Processor Time", "_Total");
+        private System.Diagnostics.PerformanceCounter _ramCounter =
+            new System.Diagnostics.PerformanceCounter("Memory", "% Committed Bytes In Use");
+        private List<float> _cpuHistory = new List<float>();
     }
     internal static class NativeMethods
     {
@@ -239,6 +357,4 @@ namespace Jarvis
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         internal static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     }
-
-
 }
