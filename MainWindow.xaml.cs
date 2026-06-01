@@ -1,14 +1,17 @@
-﻿using System.Text;
+﻿using System.IO;
+using System.Net.Http;
+using System.Text;
 using System.Windows;
-using System.Windows.Media.Animation;
-using System.Windows.Media;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Collections.Generic;
 
 namespace Jarvis
 {
@@ -150,6 +153,7 @@ namespace Jarvis
         /// </summary>
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            await EnsureModelDownloaded();
             StartFadeIn();       // Плавна поява вікна
             StartMicAnimation(); // Анімація кнопки мікрофона (пульсація)
             StartCoreAnimation(); // Обертання AI-ядра (зовнішнє кільце)
@@ -340,6 +344,91 @@ namespace Jarvis
                 AiStateText.Text = "Слухаю...";
                 AddLog("🎙️", "Мікрофон увімкнено", "Очікування слова Jarvis", "#00FF88");
             }
+        }
+
+        private async Task EnsureModelDownloaded()
+        {
+            string modelDir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "VASYA");
+            string checkFile = System.IO.Path.Combine(modelDir, "am", "final.mdl");
+
+            if (File.Exists(checkFile) && new FileInfo(checkFile).Length > 1024 * 1024)
+                return;
+
+            AiStateText.Text = "Завантаження моделі...";
+            AiSubStateText.Text = "Перший запуск, зачекайте (~1 GB)";
+
+            string baseUrl = "https://pub-891b2194b1004c19bbc501b7262a6c22.r2.dev";
+
+            var files = new Dictionary<string, string>
+            {
+                ["am/final.mdl"] = $"{baseUrl}/am/final.mdl",
+                ["conf/mfcc.conf"] = $"{baseUrl}/conf/mfcc.conf",
+                ["conf/model.conf"] = $"{baseUrl}/conf/model.conf",
+                ["graph/HCLG.fst"] = $"{baseUrl}/graph/HCLG.fst",
+                ["graph/words.txt"] = $"{baseUrl}/graph/words.txt",
+                ["graph/phones/word_boundary.int"] = $"{baseUrl}/graph/phones/word_boundary.int",
+                ["ivector/final.dubm"] = $"{baseUrl}/ivector/final.dubm",
+                ["ivector/final.ie"] = $"{baseUrl}/ivector/final.ie",
+                ["ivector/final.mat"] = $"{baseUrl}/ivector/final.mat",
+                ["ivector/global_cmvn.stats"] = $"{baseUrl}/ivector/global_cmvn.stats",
+                ["ivector/online_cmvn.conf"] = $"{baseUrl}/ivector/online_cmvn.conf",
+                ["ivector/splice.conf"] = $"{baseUrl}/ivector/splice.conf",
+                ["ivector/splice_opts"] = $"{baseUrl}/ivector/splice_opts",
+            };
+
+            using (HttpClient client = new HttpClient())
+            {
+                client.Timeout = TimeSpan.FromMinutes(60);
+
+                int current = 0;
+                int total = files.Count;
+
+                foreach (var file in files)
+                {
+                    current++;
+                    string localPath = System.IO.Path.Combine(modelDir, file.Key.Replace('/', System.IO.Path.DirectorySeparatorChar));
+                    Directory.CreateDirectory(System.IO.Path.GetDirectoryName(localPath));
+
+                    if (File.Exists(localPath) && new FileInfo(localPath).Length > 1024)
+                        continue;
+
+                    AiStateText.Text = $"Файл {current}/{total}";
+                    AiSubStateText.Text = file.Key;
+
+                    try
+                    {
+                        var response = await client.GetAsync(file.Value, HttpCompletionOption.ResponseHeadersRead);
+                        long? totalBytes = response.Content.Headers.ContentLength;
+
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var fileStream = File.Create(localPath))
+                        {
+                            byte[] buffer = new byte[81920];
+                            long downloaded = 0;
+                            int bytesRead;
+
+                            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                            {
+                                await fileStream.WriteAsync(buffer, 0, bytesRead);
+                                downloaded += bytesRead;
+
+                                if (totalBytes.HasValue)
+                                {
+                                    int percent = (int)(downloaded * 100 / totalBytes.Value);
+                                    AiStateText.Text = $"Файл {current}/{total}: {percent}%";
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Помилка завантаження {file.Key}:\n{ex.Message}");
+                    }
+                }
+            }
+
+            AiStateText.Text = "Очікування";
+            AiSubStateText.Text = "Готовий до нових команд";
         }
 
         private VoiceAssistant _voice;
