@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Text;
@@ -10,40 +11,30 @@ namespace Jarvis
 {
     public class VoiceAssistant
     {
-        private readonly MediaPlayer _player;
+        private readonly List<MediaPlayer> _activePlayers = new List<MediaPlayer>();
 
-        // API
-        private readonly string _apiKey = "sk_65a234da2e4e40e4f3cfe0804be4d26bbbbd7d94030c7652";
+        private readonly string _apiKey = GetConfig("ElevenLabsApiKey");
+        private readonly string _voiceId = GetConfig("ElevenLabsVoiceId");
 
-        // ID voice
-        private readonly string _voiceId = "ErXwobaYiN019PkySvjV";
-
-        public VoiceAssistant()
+        private static string GetConfig(string key)
         {
-            _player = new MediaPlayer();
-            _player.Volume = 1.0;
-
-            // Відстежуємо помилки самого плеєра Windows
-            _player.MediaFailed += (s, e) =>
-            {
-                MessageBox.Show($"Плеєр не зміг відтворити файл!\nПричина: {e.ErrorException?.Message}", "Помилка MediaPlayer");
-            };
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+            if (!File.Exists(path)) return "";
+            var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+            return json.RootElement.GetProperty(key).GetString() ?? "";
         }
 
         public async Task SpeakAsync(string text)
         {
-
             try
             {
                 using (HttpClient client = new HttpClient())
                 {
-                    // Авторизація ElevenLabs
                     client.DefaultRequestHeaders.Add("xi-api-key", _apiKey);
                     client.DefaultRequestHeaders.Add("User-Agent", "JarvisApp/1.0");
 
                     string url = $"https://api.elevenlabs.io/v1/text-to-speech/{_voiceId}";
 
-                    // Формуємо запит.
                     string jsonBody = $@"{{
                         ""text"": ""{text}"",
                         ""model_id"": ""eleven_multilingual_v2"",
@@ -54,32 +45,37 @@ namespace Jarvis
                     }}";
 
                     var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-
-                    // Відправляємо запит на сервер
                     HttpResponseMessage response = await client.PostAsync(url, content);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        // Зберігаємо отримане аудіо у тимчасовий файл
                         byte[] audioBytes = await response.Content.ReadAsByteArrayAsync();
-                        string tempFile = Path.Combine(Path.GetTempPath(), "jarvis_elevenlabs.mp3");
+                        string tempFile = Path.Combine(Path.GetTempPath(), $"jarvis_{Guid.NewGuid()}.mp3");
                         File.WriteAllBytes(tempFile, audioBytes);
 
-                        // Відтворюємо
-                        _player.Open(new Uri(tempFile));
-                        _player.Play();
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            MediaPlayer player = new MediaPlayer();
+                            player.MediaEnded += (s, e) =>
+                            {
+                                _activePlayers.Remove(player);
+                                try { File.Delete(tempFile); } catch { }
+                            };
+                            _activePlayers.Add(player);
+                            player.Open(new Uri(tempFile));
+                            player.Play();
+                        });
                     }
                     else
                     {
-                        // Якщо ElevenLabs свариться (наприклад, закінчився ліміт символів)
                         string errorMsg = await response.Content.ReadAsStringAsync();
-                        MessageBox.Show($"Помилка сервера ElevenLabs (Код {response.StatusCode}):\n{errorMsg}", "Помилка API");
+                        MessageBox.Show($"Помилка ElevenLabs (Код {response.StatusCode}):\n{errorMsg}", "Помилка API");
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Помилка мережі: {ex.Message}", "Помилка завантаження");
+                MessageBox.Show($"Помилка мережі: {ex.Message}", "Помилка");
             }
         }
 
