@@ -1,5 +1,4 @@
-﻿using Microsoft.VisualBasic;
-using NAudio.Wave;
+﻿using NAudio.Wave;
 using System;
 using System.IO;
 using System.Net.Http;
@@ -62,19 +61,22 @@ namespace Jarvis
                         string tempFile = Path.Combine(Path.GetTempPath(), $"jarvis_{Guid.NewGuid()}.mp3");
                         File.WriteAllBytes(tempFile, audioBytes);
 
-                        _player.Open(new Uri(tempFile));
-                        _player.Play();
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            _player.Open(new Uri(tempFile));
+                            _player.Play();
+                        });
                     }
                     else
                     {
                         string errorMsg = await response.Content.ReadAsStringAsync();
-                        MessageBox.Show($"Помилка сервера ElevenLabs (Код {response.StatusCode}):\n{errorMsg}", "Помилка API");
+                        MessageBox.Show($"Помилка ElevenLabs (Код {response.StatusCode}):\n{errorMsg}", "Помилка API");
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Помилка мережі: {ex.Message}", "Помилка завантаження");
+                MessageBox.Show($"Помилка мережі: {ex.Message}", "Помилка");
             }
         }
 
@@ -107,7 +109,8 @@ namespace Jarvis
 
                 Vosk.Vosk.SetLogLevel(-1);
                 var model = new Model(modelPath);
-                _voskRecognizer = new VoskRecognizer(model, 16000.0f);
+                _voskRecognizer = new VoskRecognizer(model, 16000.0f,
+    "[\"джарвіс\", \"джарвис\", \"блокнот\", \"калькулятор\", \"браузер\", \"час\", \"година\", \"привіт\", \"закрий\", \"[unk]\"]");
 
                 _waveIn = new WaveInEvent();
                 _waveIn.WaveFormat = new WaveFormat(16000, 1);
@@ -120,8 +123,11 @@ namespace Jarvis
                         var text = System.Text.Json.JsonDocument.Parse(result)
                                    .RootElement.GetProperty("text").GetString()?.ToLower() ?? "";
 
+                        // Діагностика — показує що розпізнав Vosk
                         if (!string.IsNullOrWhiteSpace(text))
+                        {
                             onCommandRecognized(text);
+                        }
                     }
                 };
             }
