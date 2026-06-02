@@ -1,5 +1,6 @@
-﻿using NAudio.Wave;
+using NAudio.Wave;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Text;
@@ -12,7 +13,7 @@ namespace Jarvis
 {
     public class VoiceAssistant
     {
-        private readonly MediaPlayer _player;
+        private readonly List<MediaPlayer> _activePlayers = new List<MediaPlayer>();
         private bool _isListening = false;
         private VoskRecognizer? _voskRecognizer;
         private WaveInEvent? _waveIn;
@@ -31,13 +32,7 @@ namespace Jarvis
 
         public VoiceAssistant()
         {
-            _player = new MediaPlayer();
-            _player.Volume = 1.0;
-
-            _player.MediaFailed += (s, e) =>
-            {
-                MessageBox.Show($"Плеєр не зміг відтворити файл!\nПричина: {e.ErrorException?.Message}", "Помилка MediaPlayer");
-            };
+            
         }
 
         public async Task SpeakAsync(string text)
@@ -71,8 +66,16 @@ namespace Jarvis
 
                         Application.Current.Dispatcher.Invoke(() =>
                         {
-                            _player.Open(new Uri(tempFile));
-                            _player.Play();
+                            // front: додатковий плеєр з авто-видаленням temp-файлу
+                            MediaPlayer player = new MediaPlayer();
+                            player.MediaEnded += (s, e) =>
+                            {
+                                _activePlayers.Remove(player);
+                                try { File.Delete(tempFile); } catch { }
+                            };
+                            _activePlayers.Add(player);
+                            player.Open(new Uri(tempFile));
+                            player.Play();
                         });
                     }
                     else
@@ -118,7 +121,7 @@ namespace Jarvis
                 Vosk.Vosk.SetLogLevel(-1);
                 var model = new Model(modelPath);
                 _voskRecognizer = new VoskRecognizer(model, 16000.0f,
-    "[\"джарвіс\", \"джарвис\", \"блокнот\", \"калькулятор\", \"браузер\", \"час\", \"година\", \"привіт\", \"закрий\", \"[unk]\"]");
+                    "[\"джарвіс\", \"джарвис\", \"блокнот\", \"калькулятор\", \"браузер\", \"час\", \"година\", \"привіт\", \"закрий\", \"[unk]\"]");
 
                 _waveIn = new WaveInEvent();
                 _waveIn.WaveFormat = new WaveFormat(16000, 1);
@@ -131,7 +134,6 @@ namespace Jarvis
                         var text = System.Text.Json.JsonDocument.Parse(result)
                                    .RootElement.GetProperty("text").GetString()?.ToLower() ?? "";
 
-                        // Діагностика — показує що розпізнав Vosk
                         if (!string.IsNullOrWhiteSpace(text))
                         {
                             onCommandRecognized(text);

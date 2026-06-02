@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -16,6 +17,7 @@ namespace Jarvis
     public partial class MainWindow : Window
     {
         private VoiceAssistant _voice;
+        private bool isListening = false;
 
         private System.Diagnostics.PerformanceCounter _cpuCounter =
             new System.Diagnostics.PerformanceCounter("Processor", "% Processor Time", "_Total");
@@ -76,7 +78,7 @@ namespace Jarvis
             StartMicAnimation();
             StartCoreAnimation();
 
-            // Спочатку качаємо модель
+            // Спочатку завантажуємо модель
             await EnsureModelDownloaded();
 
             // Тільки після завантаження ініціалізуємо Vosk
@@ -140,18 +142,19 @@ namespace Jarvis
 
         private async Task EnsureModelDownloaded()
         {
-            string modelDir = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "model");
-            string checkFile = System.IO.Path.Combine(modelDir, "am", "final.mdl");
+            // HEAD version: downloads from R2 CDN into "model" folder
+            string modelDirHead = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "model");
+            string checkFileHead = System.IO.Path.Combine(modelDirHead, "am", "final.mdl");
 
-            if (File.Exists(checkFile) && new FileInfo(checkFile).Length > 1024 * 1024)
-                return;
+            bool headReady = File.Exists(checkFileHead) && new FileInfo(checkFileHead).Length > 1024 * 1024;
 
             AiStateText.Text = "Завантаження моделі...";
             AiSubStateText.Text = "Перший запуск, зачекайте (~1 GB)";
 
+            // ---- HEAD sources (R2 CDN) ----
             string baseUrl = "https://pub-891b2194b1004c19bbc501b7262a6c22.r2.dev";
 
-            var files = new Dictionary<string, string>
+            var filesHead = new Dictionary<string, string>
             {
                 ["am/final.mdl"] = $"{baseUrl}/am/final.mdl",
                 ["conf/mfcc.conf"] = $"{baseUrl}/conf/mfcc.conf",
@@ -185,55 +188,74 @@ namespace Jarvis
                 ["ivector/splice_opts"] = 10,
             };
 
+            // ---- front sources (HuggingFace / VASYA) ----
+            var filesFront = new Dictionary<string, string>
+            {
+                ["am/final.mdl"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/am/final.mdl",
+                ["conf/mfcc.conf"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/conf/mfcc.conf",
+                ["conf/model.conf"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/conf/model.conf",
+                ["graph/HCLG.fst"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/graph/HCLG.fst",
+                ["graph/words.txt"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/graph/words.txt",
+                ["graph/phones/word_boundary.int"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/graph/phones/word_boundary.int",
+                ["ivector/final.dubm"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/ivector/final.dubm",
+                ["ivector/final.ie"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/ivector/final.ie",
+                ["ivector/final.mat"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/ivector/final.mat",
+                ["ivector/global_cmvn.stats"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/ivector/global_cmvn.stats",
+                ["ivector/online_cmvn.conf"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/ivector/online_cmvn.conf",
+                ["ivector/splice.conf"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/ivector/splice.conf",
+                ["ivector/splice_opts"] = "https://huggingface.co/Zumich312/VASYA/resolve/main/ivector/splice_opts",
+            };
+
             using (HttpClient client = new HttpClient())
             {
                 client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
                 client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0");
 
-                int current = 0;
-                int total = files.Count;
-
-                foreach (var file in files)
+                // Download HEAD model (R2)
+                if (!headReady)
                 {
-                    current++;
-                    string localPath = System.IO.Path.Combine(modelDir, file.Key.Replace('/', System.IO.Path.DirectorySeparatorChar));
-                    Directory.CreateDirectory(System.IO.Path.GetDirectoryName(localPath));
-
-                    long minSize = minSizes.ContainsKey(file.Key) ? minSizes[file.Key] : 10;
-                    if (File.Exists(localPath) && new FileInfo(localPath).Length >= minSize)
-                        continue;
-
-                    AiStateText.Text = $"Файл {current}/{total}";
-                    AiSubStateText.Text = file.Key;
-
-                    try
+                    int current = 0;
+                    int total = filesHead.Count;
+                    foreach (var file in filesHead)
                     {
-                        var response = await client.GetAsync(file.Value, HttpCompletionOption.ResponseHeadersRead);
-                        long? totalBytes = response.Content.Headers.ContentLength;
+                        current++;
+                        string localPath = System.IO.Path.Combine(modelDirHead, file.Key.Replace('/', System.IO.Path.DirectorySeparatorChar));
+                        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(localPath));
 
-                        using (var stream = await response.Content.ReadAsStreamAsync())
-                        using (var fileStream = File.Create(localPath))
+                        long minSize = minSizes.ContainsKey(file.Key) ? minSizes[file.Key] : 10;
+                        if (File.Exists(localPath) && new FileInfo(localPath).Length >= minSize)
+                            continue;
+
+                        AiStateText.Text = $"[model] Файл {current}/{total}";
+                        AiSubStateText.Text = file.Key;
+
+                        try
                         {
-                            byte[] buffer = new byte[81920];
-                            long downloaded = 0;
-                            int bytesRead;
+                            var response = await client.GetAsync(file.Value, HttpCompletionOption.ResponseHeadersRead);
+                            long? totalBytes = response.Content.Headers.ContentLength;
 
-                            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                            using (var stream = await response.Content.ReadAsStreamAsync())
+                            using (var fileStream = File.Create(localPath))
                             {
-                                await fileStream.WriteAsync(buffer, 0, bytesRead);
-                                downloaded += bytesRead;
-
-                                if (totalBytes.HasValue)
+                                byte[] buffer = new byte[81920];
+                                long downloaded = 0;
+                                int bytesRead;
+                                while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
                                 {
-                                    int percent = (int)(downloaded * 100 / totalBytes.Value);
-                                    AiStateText.Text = $"Файл {current}/{total}: {percent}%";
+                                    await fileStream.WriteAsync(buffer, 0, bytesRead);
+                                    downloaded += bytesRead;
+                                    if (totalBytes.HasValue)
+                                    {
+                                        int percent = (int)(downloaded * 100 / totalBytes.Value);
+                                        AiStateText.Text = $"[model] Файл {current}/{total}: {percent}%";
+                                    }
                                 }
                             }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Помилка завантаження {file.Key}:\n{ex.Message}");
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"Помилка завантаження {file.Key}:\n{ex.Message}");
+                        }
                     }
                 }
             }
@@ -243,7 +265,7 @@ namespace Jarvis
         }
 
         // ========================================================================
-        // АНІМАЦІЇ
+        // АНІМАЦІЇ ІНТЕРФЕЙСУ
         // ========================================================================
 
         private void StartFadeIn()
@@ -294,17 +316,21 @@ namespace Jarvis
         }
 
         // ========================================================================
-        // УПРАВЛІННЯ ВІКНОМ
+        // УПРАВЛІННЯ ВІКНОМ (Перетягування та кнопки)
         // ========================================================================
 
-        private void Header_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.LeftButton == System.Windows.Input.MouseButtonState.Pressed)
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
                 this.DragMove();
+            }
         }
 
-        private void BtnMinimize_Click(object sender, RoutedEventArgs e) =>
+        private void BtnMinimize_Click(object sender, RoutedEventArgs e)
+        {
             this.WindowState = WindowState.Minimized;
+        }
 
         private void BtnMaximize_Click(object sender, RoutedEventArgs e)
         {
@@ -314,8 +340,10 @@ namespace Jarvis
                 this.WindowState = WindowState.Normal;
         }
 
-        private void BtnClose_Click(object sender, RoutedEventArgs e) =>
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
             Application.Current.Shutdown();
+        }
 
         // ========================================================================
         // ЖУРНАЛ ПОДІЙ
@@ -341,65 +369,8 @@ namespace Jarvis
         }
 
         // ========================================================================
-        // ШВИДКІ ДІЇ
+        // ЛОГІКА ТЕКСТОВОГО ЧАТУ
         // ========================================================================
-
-        private void BtnOpenNotepad_Click(object sender, RoutedEventArgs e)
-        {
-            var existing = System.Diagnostics.Process.GetProcessesByName("notepad");
-            if (existing.Length > 0)
-                NativeMethods.SetForegroundWindow(existing[0].MainWindowHandle);
-            else
-            {
-                System.Diagnostics.Process.Start("notepad.exe");
-                AddLog("📝", "Блокнот відкрито", "Запуск Notepad", "#00C8FF");
-            }
-        }
-
-        private void BtnOpenCalc_Click(object sender, RoutedEventArgs e)
-        {
-            System.Diagnostics.Process.Start("calc.exe");
-            AddLog("🧮", "Калькулятор відкрито", "Запуск Calculator", "#00C8FF");
-        }
-
-        private void BtnOpenBrowser_Click(object sender, RoutedEventArgs e)
-        {
-            var existing = System.Diagnostics.Process.GetProcessesByName("chrome");
-            if (existing.Length > 0)
-                NativeMethods.SetForegroundWindow(existing[0].MainWindowHandle);
-            else
-            {
-                string chromePath = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
-                System.Diagnostics.Process.Start(chromePath);
-                AddLog("🌐", "Браузер відкрито", "Запуск Chrome", "#00C8FF");
-            }
-        }
-
-        private void BtnClearLog_Click(object sender, RoutedEventArgs e)
-        {
-            LogListBox.Items.Clear();
-            AddLog("🗑️", "Журнал очищено", "Всі записи видалено", "#FF6B6B");
-        }
-
-        // ========================================================================
-        // КНОПКА МІКРОФОНА
-        // ========================================================================
-
-        private void MicButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_voice.IsListening)
-            {
-                _voice.StopListening();
-                AiStateText.Text = "Мікрофон вимкнено";
-                AddLog("🎙️", "Мікрофон вимкнено", "Очікування команди", "#FF6B6B");
-            }
-            else
-            {
-                _voice.StartListening();
-                AiStateText.Text = "Слухаю...";
-                AddLog("🎙️", "Мікрофон увімкнено", "Очікування слова Jarvis", "#00FF88");
-            }
-        }
 
         private static string GetConfig(string key)
         {
@@ -412,14 +383,234 @@ namespace Jarvis
             var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
             return json.RootElement.GetProperty(key).GetString() ?? "";
         }
+
+        private async Task<string> SendToAI(string prompt)
+        {
+            try
+            {
+                string apiKey = GetConfig("GroqApiKey");
+                string url = "https://api.groq.com/openai/v1/chat/completions";
+
+                using (HttpClient client = new HttpClient())
+                {
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+
+                    var requestData = new
+                    {
+                        model = "llama-3.3-70b-versatile",
+                        max_tokens = 1024,
+                        messages = new[]
+                        {
+                            new { role = "system", content = "Ти голосовий асистент JARVIS. Відповідай коротко і по справі українською мовою." },
+                            new { role = "user", content = prompt }
+                        }
+                    };
+
+                    string jsonBody = JsonSerializer.Serialize(requestData);
+                    var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+
+                    var response = await client.PostAsync(url, content);
+                    string responseString = await response.Content.ReadAsStringAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        using (JsonDocument doc = JsonDocument.Parse(responseString))
+                        {
+                            return doc.RootElement
+                                .GetProperty("choices")[0]
+                                .GetProperty("message")
+                                .GetProperty("content")
+                                .GetString();
+                        }
+                    }
+                    else
+                    {
+                        return $"Помилка API ({response.StatusCode}): {responseString}";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"Критична помилка: {ex.Message}";
+            }
+        }
+
+        private void ChatInput_GotFocus(object sender, RoutedEventArgs e)
+        {
+            VoiceCorePanel.Visibility = Visibility.Collapsed;
+            TextChatPanel.Visibility = Visibility.Visible;
+        }
+
+        private void ChatInput_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(ChatInput.Text))
+                ChatPlaceholder.Visibility = Visibility.Visible;
+            else
+                ChatPlaceholder.Visibility = Visibility.Hidden;
+        }
+
+        private async void ChatInput_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                string command = ChatInput.Text.Trim();
+
+                if (!string.IsNullOrEmpty(command))
+                {
+                    AddChatMessage(command, true);
+                    ChatInput.Text = "";
+
+                    AiStateText.Text = "Обробка...";
+                    AiSubStateText.Text = command;
+
+                    string aiResponse = await SendToAI(command);
+                    AddChatMessage(aiResponse, false);
+
+                    _ = _voice.SpeakAsync(aiResponse);
+
+                    AiStateText.Text = "Очікування";
+                    AiSubStateText.Text = "Готовий до нових команд";
+                }
+            }
+        }
+
+        private void AddChatMessage(string text, bool isUser)
+        {
+            Border bubble = new Border
+            {
+                CornerRadius = isUser ? new CornerRadius(15, 15, 0, 15) : new CornerRadius(15, 15, 15, 0),
+                Background = isUser ? new SolidColorBrush(Color.FromRgb(0, 97, 255)) : new SolidColorBrush(Color.FromRgb(26, 36, 56)),
+                Padding = new Thickness(15, 10, 15, 10),
+                Margin = isUser ? new Thickness(50, 0, 0, 15) : new Thickness(0, 0, 50, 15),
+                HorizontalAlignment = isUser ? HorizontalAlignment.Right : HorizontalAlignment.Left
+            };
+
+            TextBlock messageText = new TextBlock
+            {
+                Text = text,
+                Foreground = Brushes.White,
+                FontSize = 14,
+                TextWrapping = TextWrapping.Wrap
+            };
+
+            bubble.Child = messageText;
+            ChatHistoryPanel.Children.Add(bubble);
+            ChatScroll.ScrollToBottom();
+        }
+
+        // ========================================================================
+        // КНОПКА МІКРОФОНА
+        // ========================================================================
+
+        private void MicButton_Click(object sender, RoutedEventArgs e)
+        {
+            // front: toggle voice panel visibility
+            TextChatPanel.Visibility = Visibility.Collapsed;
+            VoiceCorePanel.Visibility = Visibility.Visible;
+            Keyboard.ClearFocus();
+
+            // HEAD: toggle VoiceAssistant listening state
+            if (_voice.IsListening)
+            {
+                _voice.StopListening();
+                isListening = false;
+                AiStateText.Text = "Мікрофон вимкнено";
+                AiSubStateText.Text = "Натисніть мікрофон для старту";
+                OuterRing.Stroke = new SolidColorBrush(Color.FromRgb(0, 97, 255));
+                AddLog("🎙️", "Мікрофон вимкнено", "Очікування команди", "#FF6B6B");
+            }
+            else
+            {
+                _voice.StartListening();
+                isListening = true;
+                AiStateText.Text = "Слухаю...";
+                AiSubStateText.Text = "Говоріть зараз...";
+                OuterRing.Stroke = new SolidColorBrush(Color.FromRgb(255, 69, 0));
+                AddLog("🎙️", "Мікрофон увімкнено", "Очікування слова Jarvis", "#00FF88");
+            }
+        }
+
+        // ========================================================================
+        // ШВИДКІ ДІЇ
+        // ========================================================================
+
+        private void BtnOpenNotepad_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var existing = System.Diagnostics.Process.GetProcessesByName("notepad");
+                if (existing.Length > 0)
+                {
+                    var process = existing[0];
+                    NativeMethods.SetForegroundWindow(process.MainWindowHandle);
+                    System.Threading.Thread.Sleep(200);
+
+                    NativeMethods.keybd_event(0x11, 0, 0, 0); // Ctrl down
+                    NativeMethods.keybd_event(0x4E, 0, 0, 0); // N down
+                    NativeMethods.keybd_event(0x4E, 0, 2, 0); // N up
+                    NativeMethods.keybd_event(0x11, 0, 2, 0); // Ctrl up
+                }
+                else
+                {
+                    System.Diagnostics.Process.Start("notepad.exe");
+                    AddLog("📝", "Блокнот відкрито", "Запуск Notepad", "#00C8FF");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Помилка: {ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnOpenCalc_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start("calc.exe");
+                AddLog("🧮", "Калькулятор відкрито", "Запуск Calculator", "#00C8FF");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Не вдалося відкрити калькулятор: {ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnOpenBrowser_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var existing = System.Diagnostics.Process.GetProcessesByName("chrome");
+                if (existing.Length > 0)
+                    NativeMethods.SetForegroundWindow(existing[0].MainWindowHandle);
+                else
+                {
+                    string chromePath = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
+                    System.Diagnostics.Process.Start(chromePath);
+                    AddLog("🌐", "Браузер відкрито", "Запуск Chrome", "#00C8FF");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Не вдалося відкрити браузер: {ex.Message}", "Помилка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnClearLog_Click(object sender, RoutedEventArgs e)
+        {
+            LogListBox.Items.Clear();
+            AddLog("🗑️", "Журнал очищено", "Всі записи видалено", "#FF6B6B");
+        }
     }
 
     internal static class NativeMethods
     {
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [DllImport("user32.dll")]
         internal static extern bool SetForegroundWindow(IntPtr hWnd);
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [DllImport("user32.dll")]
         internal static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        internal static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
     }
 }
