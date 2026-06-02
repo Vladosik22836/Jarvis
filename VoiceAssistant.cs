@@ -18,8 +18,16 @@ namespace Jarvis
         private WaveInEvent? _waveIn;
         public bool IsListening => _isListening;
 
-        private readonly string _apiKey = "sk_65a234da2e4e40e4f3cfe0804be4d26bbbbd7d94030c7652";
-        private readonly string _voiceId = "ErXwobaYiN019PkySvjV";
+        private readonly string _apiKey = GetConfig("ElevenLabsApiKey");
+        private readonly string _voiceId = GetConfig("ElevenLabsVoiceId");
+
+        private static string GetConfig(string key)
+        {
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+            if (!File.Exists(path)) return "";
+            var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+            return json.RootElement.GetProperty(key).GetString() ?? "";
+        }
 
         public VoiceAssistant()
         {

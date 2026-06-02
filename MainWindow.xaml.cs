@@ -400,6 +400,18 @@ namespace Jarvis
                 AddLog("🎙️", "Мікрофон увімкнено", "Очікування слова Jarvis", "#00FF88");
             }
         }
+
+        private static string GetConfig(string key)
+        {
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+            if (!File.Exists(path))
+            {
+                MessageBox.Show("Файл appsettings.json не знайдено!\nСкопіюй appsettings.example.json і заповни ключі.");
+                return "";
+            }
+            var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+            return json.RootElement.GetProperty(key).GetString() ?? "";
+        }
     }
 
     internal static class NativeMethods
