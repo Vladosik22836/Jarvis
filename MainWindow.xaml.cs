@@ -108,6 +108,29 @@ namespace Jarvis
                             string time = DateTime.Now.ToString("HH:mm");
                             await _voice.SpeakAsync($"Зараз {time}, сер.");
                         }
+                        else if (command.Contains("закрий") || command.Contains("закрити") || command.Contains("зупини"))
+                        {
+                            if (command.Contains("блокнот") || command.Contains("notepad"))
+                            {
+                                CloseProcesses("notepad");
+                                await _voice.SpeakAsync("Закриваю блокнот, сер.");
+                                AddLog("📝", "Блокнот закрито", "Закрито голосовою командою", "#FF6B6B");
+                            }
+                            else if (command.Contains("калькулятор") || command.Contains("calc"))
+                            {
+                                CloseProcesses("CalculatorApp", "Calculator");
+                                await _voice.SpeakAsync("Закриваю калькулятор, сер.");
+                                AddLog("🧮", "Калькулятор закрито", "Закрито голосовою командою", "#FF6B6B");
+                            }
+                            else if (command.Contains("браузер") || command.Contains("хром") || command.Contains("chrome"))
+                            {
+                                CloseProcesses("chrome");
+                                await _voice.SpeakAsync("Закриваю браузер, сер.");
+                                AddLog("🌐", "Браузер закрито", "Закрито голосовою командою", "#FF6B6B");
+                            }
+                            else
+                                await _voice.SpeakAsync("Не зрозумів, що саме закрити, сер.");
+                        }
                         else if (command.Contains("блокнот"))
                         {
                             System.Diagnostics.Process.Start("notepad.exe");
@@ -463,10 +486,102 @@ namespace Jarvis
                     AiStateText.Text = "Обробка...";
                     AiSubStateText.Text = command;
 
-                    string aiResponse = await SendToAI(command);
-                    AddChatMessage(aiResponse, false);
+                    string lowerCommand = command.ToLower();
 
-                    _ = _voice.SpeakAsync(aiResponse);
+                    // Закриття програм
+                    if ((lowerCommand.Contains("закрий") || lowerCommand.Contains("закрити") || lowerCommand.Contains("зупини")) &&
+                        (lowerCommand.Contains("блокнот") || lowerCommand.Contains("notepad")))
+                    {
+                        CloseProcesses("notepad");
+                        string reply = "Закриваю блокнот, сер.";
+                        AddChatMessage(reply, false);
+                        AddLog("📝", "Блокнот закрито", "Закрито через чат", "#FF6B6B");
+                        _ = _voice.SpeakAsync(reply);
+                    }
+                    else if ((lowerCommand.Contains("закрий") || lowerCommand.Contains("закрити") || lowerCommand.Contains("зупини")) &&
+                             (lowerCommand.Contains("калькулятор") || lowerCommand.Contains("calc")))
+                    {
+                        CloseProcesses("CalculatorApp", "Calculator");
+                        string reply = "Закриваю калькулятор, сер.";
+                        AddChatMessage(reply, false);
+                        AddLog("🧮", "Калькулятор закрито", "Закрито через чат", "#FF6B6B");
+                        _ = _voice.SpeakAsync(reply);
+                    }
+                    else if ((lowerCommand.Contains("закрий") || lowerCommand.Contains("закрити") || lowerCommand.Contains("зупини")) &&
+                             (lowerCommand.Contains("браузер") || lowerCommand.Contains("хром") || lowerCommand.Contains("chrome")))
+                    {
+                        CloseProcesses("chrome");
+                        string reply = "Закриваю браузер, сер.";
+                        AddChatMessage(reply, false);
+                        AddLog("🌐", "Браузер закрито", "Закрито через чат", "#FF6B6B");
+                        _ = _voice.SpeakAsync(reply);
+                    }
+                    // Локальна обробка команд — відкриття програм
+                    else if (lowerCommand.Contains("блокнот") || lowerCommand.Contains("notepad"))
+                    {
+                        try
+                        {
+                            var existing = System.Diagnostics.Process.GetProcessesByName("notepad");
+                            if (existing.Length > 0)
+                                NativeMethods.SetForegroundWindow(existing[0].MainWindowHandle);
+                            else
+                                System.Diagnostics.Process.Start("notepad.exe");
+
+                            string reply = "Відкриваю блокнот, сер.";
+                            AddChatMessage(reply, false);
+                            AddLog("📝", "Блокнот відкрито", "Запуск через чат", "#00C8FF");
+                            _ = _voice.SpeakAsync(reply);
+                        }
+                        catch (Exception ex)
+                        {
+                            AddChatMessage($"Не вдалося відкрити блокнот: {ex.Message}", false);
+                        }
+                    }
+                    else if (lowerCommand.Contains("калькулятор") || lowerCommand.Contains("calc"))
+                    {
+                        try
+                        {
+                            System.Diagnostics.Process.Start("calc.exe");
+                            string reply = "Відкриваю калькулятор, сер.";
+                            AddChatMessage(reply, false);
+                            AddLog("🧮", "Калькулятор відкрито", "Запуск через чат", "#00C8FF");
+                            _ = _voice.SpeakAsync(reply);
+                        }
+                        catch (Exception ex)
+                        {
+                            AddChatMessage($"Не вдалося відкрити калькулятор: {ex.Message}", false);
+                        }
+                    }
+                    else if (lowerCommand.Contains("браузер") || lowerCommand.Contains("хром") || lowerCommand.Contains("chrome"))
+                    {
+                        try
+                        {
+                            var existing = System.Diagnostics.Process.GetProcessesByName("chrome");
+                            if (existing.Length > 0)
+                                NativeMethods.SetForegroundWindow(existing[0].MainWindowHandle);
+                            else
+                            {
+                                string chromePath = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
+                                System.Diagnostics.Process.Start(chromePath);
+                            }
+
+                            string reply = "Відкриваю браузер, сер.";
+                            AddChatMessage(reply, false);
+                            AddLog("🌐", "Браузер відкрито", "Запуск через чат", "#00C8FF");
+                            _ = _voice.SpeakAsync(reply);
+                        }
+                        catch (Exception ex)
+                        {
+                            AddChatMessage($"Не вдалося відкрити браузер: {ex.Message}", false);
+                        }
+                    }
+                    else
+                    {
+                        // Всі інші повідомлення — відправляємо до AI
+                        string aiResponse = await SendToAI(command);
+                        AddChatMessage(aiResponse, false);
+                        _ = _voice.SpeakAsync(aiResponse);
+                    }
 
                     AiStateText.Text = "Очікування";
                     AiSubStateText.Text = "Готовий до нових команд";
@@ -527,6 +642,22 @@ namespace Jarvis
                 AiSubStateText.Text = "Говоріть зараз...";
                 OuterRing.Stroke = new SolidColorBrush(Color.FromRgb(255, 69, 0));
                 AddLog("🎙️", "Мікрофон увімкнено", "Очікування слова Jarvis", "#00FF88");
+            }
+        }
+
+        // ========================================================================
+        // ЗАКРИТТЯ ПРОЦЕСІВ
+        // ========================================================================
+
+        private void CloseProcesses(params string[] processNames)
+        {
+            foreach (string name in processNames)
+            {
+                var processes = System.Diagnostics.Process.GetProcessesByName(name);
+                foreach (var p in processes)
+                {
+                    try { p.Kill(); } catch { }
+                }
             }
         }
 
